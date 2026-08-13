@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+aiosqlite
+# psycopg2-binary (optionnel, seulement si besoin de la connexion sync pour alembic)
+alembic
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==3.2.2
+python-multipart
+pydantic[email]
+pydantic-settings
+fpdf2
+python-dotenv
+aiofiles
+python-dateutil
+openpyxl

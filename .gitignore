@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+node_modules/
+frontend/dist/
+*.log
+
+backend/uploads/
+backend/*_out.txt
+backend/*_err.txt
+backend/server_out.txt
+backend/server_err.txt

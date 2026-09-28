@@ -2,33 +2,53 @@
 
 ## Prérequis
 
-- Python 3.10+
+- Python 3.10+ (testé en 3.12)
 - Node.js 18+
-- PostgreSQL 14+
+- Ollama (LLM local, aucune clé API nécessaire) — https://ollama.com
+- Aucune base de données externe n'est requise : le projet utilise **SQLite**
+  (fichier `backend/gestion_stagiaires.db`).
 
-## Installation
-
-### 1. Base de données
+## 1. Ollama (chatbot local)
 
 ```bash
-# Créer la base PostgreSQL
-psql -U postgres -c "CREATE DATABASE gestion_stagiaires;"
+# Installer Ollama (voir https://ollama.com/download), puis :
+ollama pull qwen3:8b
+ollama serve
 ```
 
-### 2. Backend
+Ollama doit tourner sur `http://127.0.0.1:11434` (valeur par défaut). Le
+backend s'y connecte via une API compatible OpenAI, sans clé API
+(`LLM_API_KEY` reste vide dans `.env`).
+
+## 2. Backend
 
 ```bash
 cd backend
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-# source venv/bin/activate
+python -m venv .venv
+
+# Windows :
+.venv\Scripts\activate
+# Linux/Mac :
+# source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-### 3. Frontend
+> Note (Windows, optionnel) : `sentence-transformers` installe `torch` comme
+> dépendance. Si vous n'avez pas de GPU et voulez éviter un téléchargement
+> volumineux, installez d'abord la version CPU :
+> `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+> puis relancez `pip install -r requirements.txt`.
+
+Copiez `.env.example` en `.env` (les valeurs par défaut fonctionnent telles
+quelles en local) :
+
+```bash
+# Windows : copy .env.example .env
+# Linux/Mac : cp .env.example .env
+```
+
+## 3. Frontend
 
 ```bash
 cd frontend
@@ -37,13 +57,15 @@ npm install
 
 ## Lancement
 
-### 1. Backend
+### 1. Backend (toujours depuis le dossier `backend/`)
 
 ```bash
 cd backend
-# Activer l'environnement virtuel d'abord
 uvicorn app.main:app --reload --port 8000
 ```
+
+Les chemins RAG (`RAG_VECTOR_DB_PATH`, `RAG_DOCUMENT_PATHS`) sont relatifs à
+ce dossier — ne lancez pas `uvicorn` depuis la racine du projet.
 
 ### 2. Seed (première fois seulement)
 
@@ -59,37 +81,43 @@ cd frontend
 npm run dev
 ```
 
-L'application est accessible sur http://localhost:5173
+## RAG (recherche documentaire)
 
-## Comptes de démo
+Un index FAISS est déjà fourni dans `backend/rag_chroma_db/`
+(`faiss_index.bin`, `faiss_metadata.json`, `faiss_chunks.pkl`) et contient
+déjà les documents indexés (~3857 chunks) : au premier démarrage, **aucune
+réindexation n'est nécessaire**.
 
-| Rôle | Email | Mot de passe |
-|------|-------|-------------|
-| RH | rh@hutchinson.tn | admin123 |
-| Encadrant | encadrant@hutchinson.tn | admin123 |
-| Admin | admin@hutchinson.tn | admin123 |
+Si vous ajoutez de nouveaux documents (rapports, attestations, conventions)
+et voulez les indexer :
 
-## Architecture
-
+```bash
+cd backend
+python -m app.rag.ingestion
 ```
-backend/
-  app/
-    main.py          # Point d'entrée FastAPI
-    config.py        # Configuration
-    database.py      # Connexion PostgreSQL
-    models/          # Modèles SQLAlchemy
-    schemas/         # Schémas Pydantic
-    auth/            # Authentification JWT
-    services/        # Logique métier
-    routers/         # Points d'API
-    utils/           # Utilitaires (PDF)
-  seed.py            # Script d'initialisation
 
-frontend/
-  src/
-    components/      # Composants réutilisables
-    pages/           # Pages de l'application
-    services/        # Appels API
-    hooks/           # Hooks personnalisés
-    context/         # Contexte React (auth)
+(voir `app/rag/ingestion.py` pour les options disponibles). Le module RAG
+est conçu pour se dégrader proprement si `sentence-transformers` ou
+`faiss-cpu` sont absents ou si l'index est manquant : le chatbot continue
+alors de répondre normalement aux questions sur les données de la
+plateforme (stagiaires, notes, attestations...), avec un message indiquant
+que la recherche documentaire est momentanément indisponible.
+
+## Vérification du chatbot
+
+Une fois backend + frontend + Ollama lancés, ouvrez l'application,
+connectez-vous, et testez dans le chat :
+
+- Une question sur les données : « Combien de stagiaires sont enregistrés ? »
+- Une question documentaire : « Que dit le document concernant les rapports
+  de stage ? »
+- Une question générale : « Bonjour, présente-toi en une phrase. »
+
+## Tests
+
+```bash
+cd backend
+pytest
+# ou, plus verbeux :
+pytest -q
 ```

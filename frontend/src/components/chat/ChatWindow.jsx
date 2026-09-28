@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import { Send } from 'lucide-react'
-import { sendMessage } from '../../services/chat'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Send, Plus, Trash2 } from 'lucide-react'
+import {
+  sendMessage,
+  getConversations,
+  getMessages,
+  deleteConversation,
+} from '../../services/chat'
 import ChatMessage from './ChatMessage'
 
 const WELCOME_MESSAGE =
   "Bonjour ! Je suis l'assistant de gestion des stagiaires. Comment puis-je vous aider ?"
 
 export default function ChatWindow({ onClose }) {
+  const [conversations, setConversations] = useState([])
+  const [activeId, setActiveId] = useState(null)
   const [messages, setMessages] = useState([
     { role: 'assistant', content: WELCOME_MESSAGE },
   ])
@@ -15,9 +22,51 @@ export default function ChatWindow({ onClose }) {
   const [error, setError] = useState(null)
   const bottomRef = useRef(null)
 
+  const startNew = useCallback(() => {
+    setActiveId(null)
+    setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }])
+    setError(null)
+  }, [])
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      setConversations(await getConversations())
+    } catch {
+      // Liste non critique : le chat reste utilisable
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshConversations()
+  }, [refreshConversations])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  const openConversation = async (conversationId) => {
+    setError(null)
+    setActiveId(conversationId)
+    setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }])
+    try {
+      const history = await getMessages(conversationId)
+      if (history.length > 0) {
+        setMessages(history.map((m) => ({ role: m.role, content: m.content })))
+      }
+    } catch {
+      setError("Impossible de charger l'historique de cette conversation.")
+    }
+  }
+
+  const handleDelete = async (conversationId) => {
+    try {
+      await deleteConversation(conversationId)
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId))
+      if (activeId === conversationId) startNew()
+    } catch {
+      setError("Impossible de supprimer cette conversation.")
+    }
+  }
 
   const handleSend = async (e) => {
     e.preventDefault()
@@ -30,14 +79,25 @@ export default function ChatWindow({ onClose }) {
     setLoading(true)
 
     try {
-      const data = await sendMessage(text)
+      const data = await sendMessage(text, activeId)
       setMessages((prev) => [...prev, { role: 'assistant', content: data.response }])
-    } catch {
-      setError("Impossible de contacter l'assistant. Vérifiez votre connexion et réessayez.")
+      if (!activeId) {
+        setActiveId(data.conversation_id)
+        refreshConversations()
+      }
+    } catch (err) {
+      if (err.response?.status === 429) {
+        setError("Trop de messages envoyés. Veuillez patienter un instant.")
+      } else {
+        setError("Impossible de contacter l'assistant. Vérifiez votre connexion et réessayez.")
+      }
     } finally {
       setLoading(false)
     }
   }
+
+  const activeTitle =
+    conversations.find((c) => c.id === activeId)?.title || 'Nouvelle conversation'
 
   return (
     <div className="chat-window">
@@ -46,10 +106,49 @@ export default function ChatWindow({ onClose }) {
           <span className="chat-header-dot" />
           Assistant
         </div>
-        <button className="chat-header-close" onClick={onClose} aria-label="Fermer le chat">
-          &times;
-        </button>
+        <div className="chat-header-actions">
+          {conversations.length > 0 && (
+            <select
+              className="chat-history-select"
+              value={activeId ?? ''}
+              onChange={(e) =>
+                e.target.value ? openConversation(Number(e.target.value)) : startNew()
+              }
+              aria-label="Conversations"
+            >
+              <option value="">Nouvelle conversation</option>
+              {conversations.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title || `Conversation ${c.id}`}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            className="chat-header-action"
+            onClick={startNew}
+            title="Nouvelle conversation"
+            aria-label="Nouvelle conversation"
+          >
+            <Plus size={16} />
+          </button>
+          {activeId && (
+            <button
+              className="chat-header-action"
+              onClick={() => handleDelete(activeId)}
+              title="Supprimer la conversation"
+              aria-label="Supprimer la conversation"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+          <button className="chat-header-close" onClick={onClose} aria-label="Fermer le chat">
+            &times;
+          </button>
+        </div>
       </div>
+
+      <div className="chat-context">{activeTitle}</div>
 
       <div className="chat-messages">
         {messages.map((message, index) => (

@@ -7,3 +7,4 @@ from app.models.rapport import Rapport
 from app.models.validation import Validation, StatutValidation
 from app.models.attestation import Attestation
 from app.models.evaluation import Evaluation
+from app.models.conversation import ChatConversation, ChatMessage

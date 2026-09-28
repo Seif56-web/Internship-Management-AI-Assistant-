@@ -15,3 +15,21 @@ python-dotenv
 aiofiles
 python-dateutil
 openpyxl
+httpx
+
+# RAG Dependencies
+# sentence-transformers pulls in torch (CPU wheel by default on most
+# platforms) as a transitive dependency — no need to pin it explicitly.
+# On Windows, if the default install pulls a very large CUDA build of
+# torch and you don't have a GPU, install the CPU-only build first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+faiss-cpu
+sentence-transformers
+numpy
+pypdf
+python-docx
+
+# Tests
+pytest
+pytest-asyncio

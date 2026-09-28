@@ -1,0 +1,1 @@
+"""Package RAG (Retrieval-Augmented Generation) pour la gestion des stagiaires."""
